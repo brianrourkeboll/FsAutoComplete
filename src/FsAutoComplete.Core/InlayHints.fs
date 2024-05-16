@@ -75,11 +75,12 @@ let private getFirstPositionAfterParen (str: string) startPos =
   | str when startPos > str.Length -> -1
   | str -> str.IndexOf('(', startPos) + 1
 
-let private maxHintLength = 30
+[<Literal>]
+let maxHintLength = 30
 
-let inline private shouldTruncate (s: string) = s.Length > maxHintLength
+let inline shouldTruncate (s: string) = s.Length > maxHintLength
 
-let inline private tryTruncate (s: string) =
+let inline tryTruncate (s: string) =
   if shouldTruncate s then
     s.Substring(0, maxHintLength) + "..." |> Some
   else
@@ -815,12 +816,8 @@ type HintConfig =
     ShowParameterHints: bool }
 
 let provideHints
-  (
-    text: IFSACSourceText,
-    parseAndCheck: ParseAndCheckResults,
-    range: Range,
-    hintConfig
-  ) : Async<Hint[]> =
+  (text: IFSACSourceText, parseAndCheck: ParseAndCheckResults, range: Range, hintConfig)
+  : Async<Hint[]> =
   asyncResult {
     let! cancellationToken = Async.CancellationToken
 

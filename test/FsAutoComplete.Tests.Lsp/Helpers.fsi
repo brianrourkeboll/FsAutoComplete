@@ -36,9 +36,9 @@ module Expecto =
         val ftestCaseAsync: (string -> Async<unit> -> Test)
 
 type DisposableDirectory =
-    new: directory: string -> DisposableDirectory
-    static member Create: unit -> DisposableDirectory
-    static member From: sourceDir: string -> DisposableDirectory
+    new: directory: string * deleteParentDir : bool -> DisposableDirectory
+    static member Create: ?name : string -> DisposableDirectory
+    static member From: sourceDir: DirectoryInfo -> DisposableDirectory
     member DirectoryInfo: DirectoryInfo
     interface IDisposable
 
@@ -67,7 +67,10 @@ module Range =
 val record: cacher: Cacher<'a * 'b> -> ('a -> 'b -> AsyncLspResult<'c>)
 
 val createAdaptiveServer:
-    workspaceLoader: (unit -> #Ionide.ProjInfo.IWorkspaceLoader) -> sourceTextFactory: ISourceTextFactory -> IFSharpLspServer * ClientEvents
+    workspaceLoader: (unit -> #Ionide.ProjInfo.IWorkspaceLoader)
+    -> sourceTextFactory: ISourceTextFactory
+    -> useTransparentCompiler : bool
+    -> IFSharpLspServer * ClientEvents
 
 val defaultConfigDto: FSharpConfigDto
 val clientCaps: ClientCapabilities
@@ -111,6 +114,7 @@ val fsacDiagnostics: file: string -> (IObservable<string * obj> -> IObservable<D
 val compilerDiagnostics: file: string -> (IObservable<string * obj> -> IObservable<Diagnostic array>)
 val diagnosticsToResult: (IObservable<Diagnostic array> -> IObservable<Result<unit, Diagnostic array>>)
 val waitForParseResultsForFile: file: string -> (IObservable<string * obj> -> Async<Result<unit, Diagnostic array>>)
+val waitForDiagnosticErrorForFile: file: string -> (IObservable<string * obj> -> Async<Result<unit, Diagnostic array>>)
 val waitForFsacDiagnosticsForFile: file: string -> (IObservable<string * obj> -> Async<Result<unit, Diagnostic array>>)
 
 val waitForCompilerDiagnosticsForFile:

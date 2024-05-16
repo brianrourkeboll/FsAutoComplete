@@ -29,8 +29,11 @@ module Result =
 
   let lineLookupErr
     (r:
-      Result<'T, {| FileName: string<LocalPath>
-                    Position: FcsPos |}>)
+      Result<
+        'T,
+        {| FileName: string<LocalPath>
+           Position: FcsPos |}
+       >)
     =
     r
     |> Result.mapError (ErrorMsgUtils.formatLineLookErr >> JsonRpc.Error.InternalErrorMessage)
@@ -57,8 +60,10 @@ type DiagnosticCollection(sendDiagnostics: DocumentUri -> Diagnostic[] -> Async<
     Map.toArray diags |> Array.collect (snd >> snd) |> sendDiagnostics uri
 
   let agents =
-    System.Collections.Concurrent.ConcurrentDictionary<DocumentUri, MailboxProcessor<DiagnosticMessage> *
-    CancellationTokenSource>()
+    System.Collections.Concurrent.ConcurrentDictionary<
+      DocumentUri,
+      MailboxProcessor<DiagnosticMessage> * CancellationTokenSource
+     >()
 
   let rec restartAgent (fileUri: DocumentUri) =
     removeAgent fileUri
@@ -143,17 +148,18 @@ type DiagnosticCollection(sendDiagnostics: DocumentUri -> Diagnostic[] -> Async<
 
 module Async =
   open System.Threading.Tasks
+  open IcedTasks
 
   let rec logger = LogProvider.getLoggerByQuotation <@ logger @>
 
   let inline logCancelled e = logger.trace (Log.setMessage "Operation Cancelled" >> Log.addExn e)
 
   let withCancellation (ct: CancellationToken) (a: Async<'a>) : Async<'a> =
-    async {
+    asyncEx {
       let! ct2 = Async.CancellationToken
       use cts = CancellationTokenSource.CreateLinkedTokenSource(ct, ct2)
       let tcs = new TaskCompletionSource<'a>()
-      use _reg = cts.Token.Register(fun () -> tcs.TrySetCanceled() |> ignore)
+      use _reg = cts.Token.Register(fun () -> tcs.TrySetCanceled(cts.Token) |> ignore)
 
       let a =
         async {
@@ -165,7 +171,7 @@ module Async =
         }
 
       Async.Start(a, cts.Token)
-      return! tcs.Task |> Async.AwaitTask
+      return! tcs.Task
     }
 
   let withCancellationSafe ct work =

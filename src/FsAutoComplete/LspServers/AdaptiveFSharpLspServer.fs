@@ -44,7 +44,12 @@ open Helpers
 open System.Runtime.ExceptionServices
 
 type AdaptiveFSharpLspServer
-  (workspaceLoader: IWorkspaceLoader, lspClient: FSharpLspClient, sourceTextFactory: ISourceTextFactory) =
+  (
+    workspaceLoader: IWorkspaceLoader,
+    lspClient: FSharpLspClient,
+    sourceTextFactory: ISourceTextFactory,
+    useTransparentCompiler: bool
+  ) =
 
   let mutable lastFSharpDocumentationTypeCheck: ParseAndCheckResults option = None
 
@@ -58,7 +63,8 @@ type AdaptiveFSharpLspServer
 
   let disposables = new Disposables.CompositeDisposable()
 
-  let state = new AdaptiveState(lspClient, sourceTextFactory, workspaceLoader)
+  let state =
+    new AdaptiveState(lspClient, sourceTextFactory, workspaceLoader, useTransparentCompiler)
 
   do disposables.Add(state)
 
@@ -166,7 +172,7 @@ type AdaptiveFSharpLspServer
             do!
               rootPath
               |> Option.map (fun rootPath ->
-                async {
+                asyncEx {
                   let dotConfig = Path.Combine(rootPath, ".config", "dotnet-tools.json")
 
                   if not (File.Exists dotConfig) then
@@ -177,7 +183,6 @@ type AdaptiveFSharpLspServer
                         .WithWorkingDirectory(rootPath)
                         .ExecuteBufferedAsync()
                         .Task
-                      |> Async.AwaitTask
 
                     if result.ExitCode <> 0 then
                       fantomasLogger.warn (
@@ -195,7 +200,6 @@ type AdaptiveFSharpLspServer
                           .WithWorkingDirectory(rootPath)
                           .ExecuteBufferedAsync()
                           .Task
-                        |> Async.AwaitTask
 
                       if result.ExitCode <> 0 then
                         fantomasLogger.warn (
@@ -211,7 +215,6 @@ type AdaptiveFSharpLspServer
                       .WithWorkingDirectory(rootPath)
                       .ExecuteBufferedAsync()
                       .Task
-                    |> Async.AwaitTask
 
                   if result.ExitCode = 0 then
                     fantomasLogger.info (Log.setMessage (sprintf "fantomas was installed locally at %A" rootPath))
@@ -237,7 +240,6 @@ type AdaptiveFSharpLspServer
                 .WithArguments("tool install -g fantomas")
                 .ExecuteBufferedAsync()
                 .Task
-              |> Async.AwaitTask
 
             if result.ExitCode = 0 then
               fantomasLogger.info (Log.setMessage "fantomas was installed globally")
@@ -263,10 +265,8 @@ type AdaptiveFSharpLspServer
   member __.ScriptFileProjectOptions = state.ScriptFileProjectOptions.Publish
 
   member private x.logUnimplementedRequest<'t, 'u>
-    (
-      argValue: 't,
-      [<CallerMemberName; Optional; DefaultParameterValue("")>] caller: string
-    ) =
+    (argValue: 't, [<CallerMemberName; Optional; DefaultParameterValue("")>] caller: string)
+    =
     logger.info (
       Log.setMessage $"{caller} request: {{params}}"
       >> Log.addContextDestructured "params" argValue
@@ -275,10 +275,8 @@ type AdaptiveFSharpLspServer
     Helpers.notImplemented<'u>
 
   member private x.logIgnoredNotification<'t>
-    (
-      argValue: 't,
-      [<CallerMemberName; Optional; DefaultParameterValue("")>] caller: string
-    ) =
+    (argValue: 't, [<CallerMemberName; Optional; DefaultParameterValue("")>] caller: string)
+    =
     logger.info (
       Log.setMessage $"{caller} request: {{params}}"
       >> Log.addContextDestructured "params" argValue
@@ -321,15 +319,12 @@ type AdaptiveFSharpLspServer
             | None -> p.RootPath
 
           let projs =
-            match p.RootPath, c.AutomaticWorkspaceInit with
+            match actualRootPath, c.AutomaticWorkspaceInit with
             | None, _
             | _, false -> state.WorkspacePaths
-            | Some actualRootPath, true ->
+            | Some rootPath, true ->
               let peeks =
-                WorkspacePeek.peek
-                  actualRootPath
-                  c.WorkspaceModePeekDeepLevel
-                  (c.ExcludeProjectDirectories |> List.ofArray)
+                WorkspacePeek.peek rootPath c.WorkspaceModePeekDeepLevel (c.ExcludeProjectDirectories |> List.ofArray)
                 |> List.map Workspace.mapInteresting
                 |> List.sortByDescending (fun x ->
                   match x with
@@ -583,8 +578,8 @@ type AdaptiveFSharpLspServer
                   // Otherwise we'll fail here and our retry logic will come into place
                   do!
                     match p.Context with
-                    | Some({ triggerKind = CompletionTriggerKind.TriggerCharacter } as context) ->
-                      volatileFile.Source.TryGetChar pos = context.triggerCharacter
+                    | Some({ TriggerKind = CompletionTriggerKind.TriggerCharacter } as context) ->
+                      volatileFile.Source.TryGetChar pos = context.TriggerCharacter
                     | _ -> true
                     |> Result.requireTrue $"TextDocumentCompletion was sent before TextDocumentDidChange"
 
@@ -1202,7 +1197,7 @@ type AdaptiveFSharpLspServer
           let getAllProjects () =
             state.GetFilesToProject()
             |> Async.map (
-              Array.map (fun (file, proj) -> UMX.untag file, proj.FSharpProjectOptions)
+              Array.map (fun (file, proj) -> UMX.untag file, AVal.force proj.FSharpProjectCompilerOptions)
               >> Array.toList
             )
 
@@ -1951,8 +1946,6 @@ type AdaptiveFSharpLspServer
 
 
           let! tyRes = state.GetOpenFileTypeCheckResults filePath |> AsyncResult.ofStringErr
-
-          let _fcsRange = protocolRangeToRange (UMX.untag filePath) p.Range
 
           let! pipelineHints = Commands.inlineValues volatileFile.Source tyRes
 
@@ -2986,17 +2979,19 @@ type AdaptiveFSharpLspServer
 
     override x.Dispose() = disposables.Dispose()
 
-    member this.WorkDoneProgressCancel(token: ProgressToken) : Async<unit> =
+    member this.WorkDoneProgressCancel(param: WorkDoneProgressCancelParams) : Async<unit> =
       async {
 
-        let tags = [ "ProgressToken", box token ]
+        let tags = [ "WorkDoneProgressCancelParams", box param ]
         use trace = fsacActivitySource.StartActivityForType(thisType, tags = tags)
 
         try
           logger.info (
             Log.setMessage "WorkDoneProgressCancel Request: {params}"
-            >> Log.addContextDestructured "params" token
+            >> Log.addContextDestructured "params" param.token
           )
+
+          state.CancelServerProgress param.token
 
         with e ->
           trace |> Tracing.recordException e
@@ -3004,7 +2999,7 @@ type AdaptiveFSharpLspServer
           logException
             e
             (Log.setMessage "WorkDoneProgressCancel Request Errored {p}"
-             >> Log.addContextDestructured "token" token)
+             >> Log.addContextDestructured "token" param.token)
 
         return ()
       }
@@ -3031,8 +3026,6 @@ module AdaptiveFSharpLspServer =
         else
           None
       | _ -> None
-
-    let _strategy = StreamJsonRpcTracingStrategy(Tracing.fsacActivitySource)
 
     let (|Flatten|_|) (e: exn) =
       match e with
@@ -3072,7 +3065,7 @@ module AdaptiveFSharpLspServer =
 
 
 
-  let startCore toolsPath workspaceLoaderFactory sourceTextFactory =
+  let startCore toolsPath workspaceLoaderFactory sourceTextFactory useTransparentCompiler =
     use input = Console.OpenStandardInput()
     use output = Console.OpenStandardOutput()
 
@@ -3108,7 +3101,7 @@ module AdaptiveFSharpLspServer =
 
     let adaptiveServer lspClient =
       let loader = workspaceLoaderFactory toolsPath
-      new AdaptiveFSharpLspServer(loader, lspClient, sourceTextFactory) :> IFSharpLspServer
+      new AdaptiveFSharpLspServer(loader, lspClient, sourceTextFactory, useTransparentCompiler) :> IFSharpLspServer
 
     Ionide.LanguageServerProtocol.Server.start requestsHandlings input output FSharpLspClient adaptiveServer createRpc
 

@@ -410,7 +410,8 @@ let signatureTests state =
        |> Async.Sequential
        |> Async.map (fun _ -> ()))
 
-  testList
+  testSequenced
+  <| testList
     "signature evaluation"
     [ testList
         "tests"

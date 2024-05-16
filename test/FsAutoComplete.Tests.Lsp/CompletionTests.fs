@@ -21,7 +21,7 @@ let tests state =
       do! server.TextDocumentDidOpen tdop
 
       let! _diagnostics =
-        waitForParseResultsForFile "Script.fsx" events
+        waitForDiagnosticErrorForFile "Script.fsx" events
         |> AsyncResult.bimap (fun _ -> failtest "Should have had errors") (fun e -> e)
 
       return (server, path)
@@ -41,8 +41,8 @@ let tests state =
               Position = { Line = 3; Character = 9 } // the '.' in 'Async.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -94,8 +94,8 @@ let tests state =
                   Character = character + 1 }
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
           do! c
@@ -131,8 +131,8 @@ let tests state =
               Position = { Line = line; Character = character } // the '.' in 'GetDirectoryName().'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -183,8 +183,8 @@ let tests state =
                   Character = character + 1 }
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
           do! c
@@ -220,8 +220,8 @@ let tests state =
               Position = { Line = line; Character = character }
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -272,8 +272,8 @@ let tests state =
                   Character = character + 1 }
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
           do! c
@@ -309,8 +309,8 @@ let tests state =
               Position = { Line = line; Character = character }
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -341,8 +341,8 @@ let tests state =
               Position = { Line = 6; Character = 5 } // the '.' in 'List.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -369,8 +369,8 @@ let tests state =
               Position = { Line = 8; Character = 16 } // the '.' in 'List.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -396,8 +396,8 @@ let tests state =
               Position = { Line = 11; Character = 10 } // after Lis partial type name in Id record field declaration
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.Invoked
-                    triggerCharacter = None } }
+                  { TriggerKind = CompletionTriggerKind.Invoked
+                    TriggerCharacter = None } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -428,8 +428,8 @@ let tests state =
               Position = { Line = 8; Character = 12 } // after the 'L' in 'List.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.Invoked
-                    triggerCharacter = None } }
+                  { TriggerKind = CompletionTriggerKind.Invoked
+                    TriggerCharacter = None } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -456,8 +456,8 @@ let tests state =
               Position = { Line = 8; Character = 11 } // before the 'L' in 'List.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.Invoked
-                    triggerCharacter = None } }
+                  { TriggerKind = CompletionTriggerKind.Invoked
+                    TriggerCharacter = None } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -484,8 +484,8 @@ let tests state =
               Position = { Line = 3; Character = 9 } // the '.' in 'Async.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams |> AsyncResult.map Option.get
           let ctokMember = response.Items[0]
@@ -514,8 +514,8 @@ let tests state =
               Position = { Line = 23; Character = 8 } // the '.' in 'List.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -542,8 +542,8 @@ let tests state =
               Position = { Line = 24; Character = 9 } // the '.' in 'List.'
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.TriggerCharacter
-                    triggerCharacter = Some '.' } }
+                  { TriggerKind = CompletionTriggerKind.TriggerCharacter
+                    TriggerCharacter = Some '.' } }
 
           let! response = server.TextDocumentCompletion completionParams
 
@@ -716,7 +716,8 @@ let autocompleteTest state =
             Expect.exists res.Items (fun n -> n.Label = "Baz") "Autocomplete contains given symbol"
         }) ]
 
-  testList
+  testSequenced
+  <| testList
     "Autocomplete Tests"
     [ testList "Autocomplete within project files" (makeAutocompleteTestList server)
       testList "Autocomplete within script files" (makeAutocompleteTestList scriptServer) ]
@@ -743,7 +744,7 @@ let autoOpenTests state =
       do! server.TextDocumentDidOpen tdop
 
       do!
-        waitForParseResultsForFile scriptName events
+        waitForDiagnosticErrorForFile scriptName events
         |> AsyncResult.bimap (fun _ -> failtest "Should have had errors") id
         |> Async.Ignore
 
@@ -781,7 +782,9 @@ let autoOpenTests state =
 
       let (|ContainsOpenAction|_|) (codeActions: CodeAction[]) =
         codeActions
-        |> Array.tryFind (fun ca -> ca.Kind = Some "quickfix" && ca.Title.StartsWith("open ", StringComparison.Ordinal))
+        |> Array.tryFind (fun ca ->
+          ca.Kind = Some "quickfix"
+          && ca.Title.StartsWith("open ", StringComparison.Ordinal))
 
       match! server.TextDocumentCodeAction p with
       | Error e -> return failtestf "Quick fix Request failed: %A" e
@@ -1017,8 +1020,8 @@ let fullNameExternalAutocompleteTest state =
             Position = { Line = line; Character = character }
             Context =
               Some
-                { triggerKind = CompletionTriggerKind.Invoked
-                  triggerCharacter = None } }
+                { TriggerKind = CompletionTriggerKind.Invoked
+                  TriggerCharacter = None } }
 
         let! res = server.TextDocumentCompletion p
 
@@ -1049,8 +1052,8 @@ let fullNameExternalAutocompleteTest state =
               Position = { Line = 3; Character = 4 }
               Context =
                 Some
-                  { triggerKind = CompletionTriggerKind.Invoked
-                    triggerCharacter = None } }
+                  { TriggerKind = CompletionTriggerKind.Invoked
+                    TriggerCharacter = None } }
 
           let! response = server.TextDocumentCompletion p |> AsyncResult.map Option.get
 
@@ -1093,7 +1096,8 @@ let fullNameExternalAutocompleteTest state =
         Expect.isSome n "Completion doesn't exist"
         Expect.equal n.Value.InsertText (Some "Result") "Autocomplete contains given symbol") ]
 
-  testList
+  testSequenced
+  <| testList
     "fullNameExternalAutocompleteTest Tests"
     [ testList "fullNameExternalAutocompleteTest within project files" (makeAutocompleteTestList server)
       testList "fullNameExternalAutocompleteTest within script files" (makeAutocompleteTestList scriptServer) ]
