@@ -314,8 +314,11 @@ module SignatureFormatter =
         retType
       //A ctor with () parameters seems to be a list with an empty list.
       // Also abstract members and abstract member overrides with one () parameter seem to be a list with an empty list.
-      elif func.IsConstructor || (func.IsMember && (not func.IsPropertyGetterMethod)) then
-        modifiers + ": unit -> " ++ retType
+      elif func.IsConstructor then
+        let retType = if retType = "unit" then func.DisplayNameCore else retType
+        modifiers + ": unit ->" ++ retType
+      elif func.IsMember && (not func.IsPropertyGetterMethod) then
+        modifiers + ": unit ->" ++ retType
       else
         modifiers ++ functionName + ":" ++ retType //Value members seems to be a list with an empty list
     | [ [ p ] ] when maybeGetter && formatParameter p = "unit" -> //Member or property with only getter
@@ -593,11 +596,13 @@ module SignatureFormatter =
     let enumTip () =
       $" ={nl}  |"
       ++ (fse.FSharpFields
-          |> Seq.filter (fun f -> not f.IsCompilerGenerated)
-          |> Seq.map (fun field ->
-            match field.LiteralValue with
-            | Some lv -> field.Name + " = " + (string lv)
-            | None -> field.Name)
+          |> Seq.choose (fun field ->
+            if field.IsCompilerGenerated then
+              None
+            else
+              match field.LiteralValue with
+              | Some lv -> field.Name + " = " + (string lv) |> Some
+              | None -> Some field.Name)
           |> String.concat $"{nl}  | ")
 
     let unionTip () =

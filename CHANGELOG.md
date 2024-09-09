@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.74.1] - 2024-09-07
+
+### Added
+
+* [Allow generating match cases for DU cases when the match is empty](https://github.com/ionide/FsAutoComplete/pull/1309) (thanks @gbtb!)
+
+### Fixed
+
+* [Fix the floating code lens issues reported by many users](https://github.com/ionide/FsAutoComplete/pull/1319) (thanks @TheAngryByrd!)
+
+### Changed
+
+* [Update Fantomas.Client to get fixes for global fantomas installs](https://github.com/ionide/FsAutoComplete/pull/1320) (thanks @nojaf!)
+
+## [0.74.0] - 2024-08-18
+
+### Changed
+
+* [Updated to F# compiler libraries from the .NET 8.0.400 SDK](https://github.com/ionide/FsAutoComplete/pull/1317)
+* [Render a better return type for constructors](https://github.com/ionide/FsAutoComplete/pull/1312) (thanks @dawedawe!)
+* [Refactorings for better perf on hot paths](https://github.com/ionide/FsAutoComplete/pull/1308) (Thanks @1eyewonder)
+
+## [0.73.2] - 2024-06-17
+
+### Changed
+
+* Tweaked the logic for the two new settings to prevent overly-notifying users.
+* Use the new generated LSP models (thanks @TheAngryByrd!)
+* [Fix the insert of opened namespaces for completions](https://github.com/ionide/FsAutoComplete/pull/1300) (thanks @MrLuje!)
+
 ## [0.73.1] - 2024-05-23
 
 ### Added

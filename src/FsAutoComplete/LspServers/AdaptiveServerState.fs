@@ -114,6 +114,8 @@ type AdaptiveWorkspaceChosen =
 
 
 
+
+
 [<CustomEquality; NoComparison>]
 type LoadedProject =
   { ProjectOptions: Types.ProjectOptions
@@ -600,7 +602,7 @@ type AdaptiveState
               opens
               |> Array.map (fun n ->
                 { Range = fcsRangeToLsp n
-                  Code = Some "FSAC0001"
+                  Code = Some(U2.C2 "FSAC0001")
                   Severity = Some DiagnosticSeverity.Hint
                   Source = Some "FSAC"
                   Message = "Unused open statement"
@@ -618,7 +620,7 @@ type AdaptiveState
               decls
               |> Array.map (fun n ->
                 { Range = fcsRangeToLsp n
-                  Code = Some "FSAC0003"
+                  Code = Some(U2.C2 "FSAC0003")
                   Severity = Some DiagnosticSeverity.Hint
                   Source = Some "FSAC"
                   Message = "This value is unused"
@@ -640,7 +642,7 @@ type AdaptiveState
                      ({ Range = range
                         RelativeName = _relName }) ->
                   { Diagnostic.Range = fcsRangeToLsp range
-                    Code = Some "FSAC0002"
+                    Code = Some(U2.C2 "FSAC0002")
                     Severity = Some DiagnosticSeverity.Hint
                     Source = Some "FSAC"
                     Message = "This qualifier is redundant"
@@ -658,7 +660,7 @@ type AdaptiveState
               ranges
               |> Array.map (fun range ->
                 { Diagnostic.Range = fcsRangeToLsp range
-                  Code = Some "FSAC0004"
+                  Code = Some(U2.C2 "FSAC0004")
                   Severity = Some DiagnosticSeverity.Hint
                   Source = Some "FSAC"
                   Message = "Parentheses can be removed"
@@ -742,7 +744,7 @@ type AdaptiveState
                       |> Some
 
                   { Range = range
-                    Code = Option.ofObj m.Code
+                    Code = Option.ofObj m.Code |> Option.map U2.C2
                     Severity = Some severity
                     Source = Some $"F# Analyzers (%s{m.Type})"
                     Message = m.Message
@@ -970,8 +972,11 @@ type AdaptiveState
           | MSBuildAllProjects v ->
             yield!
               v
-              |> Array.filter (fun x -> x.EndsWith(".props", StringComparison.Ordinal) && isWithinObjFolder x)
-              |> Array.map (Utils.normalizePath >> projectFileChanges)
+              |> Array.choose (fun x ->
+                if x.EndsWith(".props", StringComparison.Ordinal) && isWithinObjFolder x then
+                  Utils.normalizePath x |> projectFileChanges |> Some
+                else
+                  None)
           | _ -> () ]
 
       HashMap.ofList
@@ -1028,12 +1033,12 @@ type AdaptiveState
           let file =
             (file, changes)
             ||> Seq.fold (fun text (change, version, touched) ->
-              match change.Range with
-              | None -> // replace entire content
+              match change with
+              | U2.C2 change -> // replace entire content
                 VolatileFile.Create(sourceTextFactory.Create(filePath, change.Text), version, touched)
-              | Some rangeToReplace ->
+              | U2.C1 change ->
                 // replace just this slice
-                let fcsRangeToReplace = protocolRangeToRange (UMX.untag filePath) rangeToReplace
+                let fcsRangeToReplace = protocolRangeToRange (UMX.untag filePath) change.Range
 
                 try
                   match text.Source.ModifyText(fcsRangeToReplace, change.Text) with
@@ -1277,20 +1282,22 @@ type AdaptiveState
 
   /// <summary>Parses a source code for a file and caches the results. Returns an AST that can be traversed for various features.</summary>
   /// <param name="checker">The FSharpCompilerServiceChecker.</param>
-  /// <param name="sourceFilePath">The source to be parsed.</param>
+  /// <param name="file">The source to be parsed.</param>
   /// <param name="compilerOptions"></param>
   /// <returns></returns>
 
-  let parseFile (checker: FSharpCompilerServiceChecker) (sourceFilePath) (compilerOptions: CompilerProjectOption) =
+
+  let parseFile (checker: FSharpCompilerServiceChecker) (file: VolatileFile) (compilerOptions: CompilerProjectOption) =
     task {
       let! result =
         match compilerOptions with
         | CompilerProjectOption.TransparentCompiler snap ->
-          taskResult { return! checker.ParseFile(sourceFilePath, snap) }
+          taskResult { return! checker.ParseFile(file.FileName, snap) }
         | CompilerProjectOption.BackgroundCompiler opts ->
           taskResult {
-            let! file = forceFindOpenFileOrRead sourceFilePath
-            return! checker.ParseFile(sourceFilePath, file.Source, opts)
+
+
+            return! checker.ParseFile(file.FileName, file.Source, opts)
           }
 
       let! ct = Async.CancellationToken
@@ -1321,8 +1328,12 @@ type AdaptiveState
         |> HashSet.toArray
         |> Array.collect (fun (snap) -> snap.SourceFilesTagged |> List.toArray |> Array.map (fun s -> snap, s))
         |> Array.map (fun (snap, filePath) ->
+          taskResult {
+            let! vFile = forceFindOpenFileOrRead filePath
+            return! parseFile checker vFile snap
 
-          parseFile checker filePath snap)
+          })
+
         |> Task.WhenAll
     }
 
@@ -1432,14 +1443,19 @@ type AdaptiveState
 
   let allFSharpFilesAndProjectOptions =
     asyncAVal {
-      let wins =
-        openFilesToChangesAndProjectOptions
-        |> AMap.map (fun _k v -> v |> AsyncAVal.mapSync (fun (_, projects) _ -> projects))
+      let wins = openFilesToChangesAndProjectOptions
 
       let! sourceFileToProjectOptions = sourceFileToProjectOptions
 
       let loses =
-        sourceFileToProjectOptions |> AMap.map (fun _ v -> AsyncAVal.constant (Ok v))
+        sourceFileToProjectOptions
+        |> AMap.map (fun file proj ->
+          asyncAVal {
+            let! lastTouched = AdaptiveFile.GetLastWriteTimeUtc(UMX.untag file)
+            let! vFile = createVolatileFileFromDisk lastTouched file
+
+            return vFile, Ok proj
+          })
 
       return AMap.union loses wins
     }
@@ -1459,7 +1475,7 @@ type AdaptiveState
 
       return
         allFSharpFilesAndProjectOptions
-        |> AMapAsync.mapAsyncAVal (fun filePath (options: Result<LoadedProject list, string>) _ctok ->
+        |> AMapAsync.mapAsyncAVal (fun filePath (file, options) _ctok ->
           asyncAVal {
             let! (checker: FSharpCompilerServiceChecker) = checker
             and! selectProject = projectSelector
@@ -1470,7 +1486,7 @@ type AdaptiveState
             match loadedProject with
             | Ok x ->
               let! snap = x.FSharpProjectCompilerOptions
-              let! r = parseFile checker filePath snap
+              let! r = parseFile checker file snap
               return r
             | Error e -> return Error e
           })
@@ -1502,7 +1518,7 @@ type AdaptiveState
 
       return
         set
-        |> Array.choose (fun (k, v) ->
+        |> Array.choose (fun (k, (_, v)) ->
           v
           |> Result.bind (findProject k)
           |> Result.toOption
@@ -1521,7 +1537,7 @@ type AdaptiveState
         |> Array.map (AsyncAVal.forceAsync)
         |> Async.parallel75
 
-      let set = set |> Array.choose (Result.toOption)
+      let set = set |> Array.choose (snd >> Result.toOption)
 
       return set |> Array.collect (List.toArray)
     }
@@ -1536,7 +1552,7 @@ type AdaptiveState
       let! allFilesToFSharpProjectOptions = allFilesToFSharpProjectOptions
 
       match! allFilesToFSharpProjectOptions |> AMapAsync.tryFindA filePath with
-      | Some projs -> return projs
+      | Some(_, projs) -> return projs
       | None -> return Error $"Couldn't find project for {filePath}. Have you tried restoring your project/solution?"
     }
 
@@ -1894,7 +1910,7 @@ type AdaptiveState
             try
               let! (text) = forceFindOpenFileOrRead file |> Async.map Option.ofResult
               let! line = tryGetLineStr pos text.Source |> Option.ofResult
-              return! Lexer.getSymbol pos.Line pos.Column line SymbolLookupKind.Fuzzy [||]
+              return! Lexer.getSymbol (uint32 pos.Line) (uint32 pos.Column) line SymbolLookupKind.Fuzzy [||]
             with _ ->
               return! None
           }
