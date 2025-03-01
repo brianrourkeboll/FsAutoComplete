@@ -249,16 +249,27 @@ module SignatureFormatter =
         "Unknown"
 
     let retTypeConstraint =
-      if func.ReturnParameter.Type.IsGenericParameter then
-        let formattedParam =
-          formatGenericParameter false displayContext func.ReturnParameter.Type.GenericParameter
+      let genericParamConstraints = ResizeArray<string>()
 
-        if String.IsNullOrWhiteSpace formattedParam then
-          formattedParam
+      let rec getGenericParameters (f: FSharpType) =
+        if f.IsGenericParameter then
+          let formattedParam = formatGenericParameter false displayContext f.GenericParameter
+
+          if not <| String.IsNullOrWhiteSpace formattedParam then
+            genericParamConstraints.Add formattedParam
         else
-          "(requires " + formattedParam + " )"
-      else
+          try
+            f.GenericArguments |> Seq.iter getGenericParameters
+          with e ->
+            () // Sometimes GenericArguments throws an exception when accessing it
+
+      getGenericParameters func.ReturnParameter.Type
+
+      if Seq.isEmpty genericParamConstraints then
         ""
+      else
+        let formattedParam = genericParamConstraints |> String.join " and " |> _.Trim()
+        "(requires " + formattedParam + ")"
 
     let safeParameterName (p: FSharpParameter) =
       match Option.defaultValue p.DisplayNameCore p.Name with
@@ -494,9 +505,15 @@ module SignatureFormatter =
           many
           |> List.map (fun (paramTypes) ->
             paramTypes
-            |> List.map (fun p -> formatName p + ":" ++ (formatParameter p))
+            |> List.map (fun p ->
+              let paramName = formatName p
+
+              if String.IsNullOrWhiteSpace(paramName) then
+                formatParameter p
+              else
+                paramName + ":" ++ (formatParameter p))
             |> String.concat (" * "))
-          |> String.concat ("-> ")
+          |> String.concat (" -> ")
 
         let typeArguments = allParams ++ "->" ++ retType
 

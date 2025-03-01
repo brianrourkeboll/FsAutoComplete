@@ -1066,6 +1066,54 @@ let private addPrivateAccessModifierTests state =
         Diagnostics.acceptAll
         selectCodeFix
 
+      testCaseAsync "add private works for autoproperty getter"
+      <| CodeFix.check
+        server
+        """
+        type MyClass() =
+          member val Name = "" with $0get, set
+        """
+        Diagnostics.acceptAll
+        selectCodeFix
+        """
+        type MyClass() =
+          member val Name = "" with private get, set
+        """
+
+      testCaseAsync "add private works for autoproperty setter"
+      <| CodeFix.check
+        server
+        """
+        type MyClass() =
+          member val Name = "" with get, s$0et
+        """
+        Diagnostics.acceptAll
+        selectCodeFix
+        """
+        type MyClass() =
+          member val Name = "" with get, private set
+        """
+
+      testCaseAsync "add private is not offered for autoproperty getter if member access is already there"
+      <| CodeFix.checkNotApplicable
+        server
+        """
+        type MyClass() =
+          member val private Name = "" with g$0et, set
+        """
+        Diagnostics.acceptAll
+        selectCodeFix
+
+      testCaseAsync "add private is not offered for autoproperty setter if member access is already there"
+      <| CodeFix.checkNotApplicable
+        server
+        """
+        type MyClass() =
+          member val private Name = "" with get, set$0
+        """
+        Diagnostics.acceptAll
+        selectCodeFix
+
       testCaseAsync "add private is not offered for DU type definition" // ref finding might not show us type inferred usages
       <| CodeFix.checkNotApplicable
         server
@@ -1971,8 +2019,8 @@ let private addMissingXmlDocumentationTests state =
         """
         let f x y =
           /// <summary>some comment</summary>
-          /// <param name=""></param>
-          /// <param name=""></param>
+          /// <param name="a"></param>
+          /// <param name="b"></param>
           /// <returns></returns>
           let g a b =
             a + b

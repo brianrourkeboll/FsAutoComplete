@@ -86,11 +86,7 @@ module Conversions =
       | Some(U2.C2 code) -> code |> Some
       | None -> None
 
-  type TextDocumentIdentifier with
-
-    member doc.GetFilePath() = Path.FileUriToLocalPath doc.Uri
-
-  type VersionedTextDocumentIdentifier with
+  type ITextDocumentIdentifier with
 
     member doc.GetFilePath() = Path.FileUriToLocalPath doc.Uri
 
@@ -139,9 +135,8 @@ module Conversions =
     (uri: DocumentUri)
     (glyphToSymbolKind: FSharpGlyph -> SymbolKind option)
     (topLevel: NavigationTopLevelDeclaration)
-    (symbolFilter: SymbolInformation -> bool)
     : SymbolInformation[] =
-    let inner (container: string option) (decl: NavigationItem) : SymbolInformation option =
+    let inner (container: string option) (decl: NavigationItem) : SymbolInformation =
       // We should nearly always have a kind, if the client doesn't send weird capabilities,
       // if we don't why not assume module...
       let kind = defaultArg (glyphToSymbolKind decl.Glyph) SymbolKind.Module
@@ -158,12 +153,64 @@ module Conversions =
           Tags = None
           Deprecated = None }
 
+      sym
+
+    [| yield inner None topLevel.Declaration
+       yield! topLevel.Nested |> Array.map (inner (Some topLevel.Declaration.LogicalName)) |]
+
+  let getDocumentSymbols
+    (glyphToSymbolKind: FSharpGlyph -> SymbolKind option)
+    (topLevel: NavigationTopLevelDeclaration)
+    : DocumentSymbol[] =
+    let inner (decl: NavigationItem) : DocumentSymbol =
+      // We should nearly always have a kind, if the client doesn't send weird capabilities,
+      // if we don't why not assume module...
+      let kind = defaultArg (glyphToSymbolKind decl.Glyph) SymbolKind.Module
+
+      let sym: DocumentSymbol =
+        { Name = decl.LogicalName
+          Kind = kind
+          Tags = None
+          Deprecated = None
+          Children = None
+          Range = fcsRangeToLsp decl.Range
+          Detail = None
+          SelectionRange = fcsRangeToLsp decl.Range }
+
+      sym
+
+    [| yield inner topLevel.Declaration
+       yield! topLevel.Nested |> Array.map inner |]
+
+  let getWorkspaceSymbols
+    (uri: DocumentUri)
+    (glyphToSymbolKind: FSharpGlyph -> SymbolKind option)
+    (topLevel: NavigationTopLevelDeclaration)
+    (symbolFilter: WorkspaceSymbol -> bool)
+    : WorkspaceSymbol[] =
+    let inner (container: string option) (decl: NavigationItem) : WorkspaceSymbol option =
+      // We should nearly always have a kind, if the client doesn't send weird capabilities,
+      // if we don't why not assume module...
+      let kind = defaultArg (glyphToSymbolKind decl.Glyph) SymbolKind.Module
+
+      let location =
+        { Uri = uri
+          Range = fcsRangeToLsp decl.Range }
+
+      let sym: WorkspaceSymbol =
+        { ContainerName = container
+          Data = None
+          Name = decl.LogicalName
+          Kind = kind
+          Location = U2.C1 location
+          Tags = None }
+
       if symbolFilter sym then Some sym else None
 
     [| yield! inner None topLevel.Declaration |> Option.toArray
        yield! topLevel.Nested |> Array.choose (inner (Some topLevel.Declaration.LogicalName)) |]
 
-  let applyQuery (query: string) (info: SymbolInformation) =
+  let inline applyQuery (query: string) (info: #IBaseSymbolInformation) =
     match query.Split([| '.' |], StringSplitOptions.RemoveEmptyEntries) with
     | [||] -> false
     | [| fullName |] -> info.Name.StartsWith(fullName, StringComparison.Ordinal)
@@ -171,12 +218,11 @@ module Conversions =
       info.Name.StartsWith(fieldName, StringComparison.Ordinal)
       && info.ContainerName = Some moduleName
     | parts ->
-      let containerName = parts.[0 .. (parts.Length - 2)] |> String.concat "."
-
+      let cName = parts.[0 .. (parts.Length - 2)] |> String.concat "."
       let fieldName = Array.last parts
 
       info.Name.StartsWith(fieldName, StringComparison.Ordinal)
-      && info.ContainerName = Some containerName
+      && info.ContainerName = Some cName
 
   let getCodeLensInformation (uri: DocumentUri) (typ: string) (topLevel: NavigationTopLevelDeclaration) : CodeLens[] =
     let map (decl: NavigationItem) : CodeLens =
@@ -207,8 +253,7 @@ module Conversions =
   let getLine (lines: string[]) (pos: LspPosition) = lines.[int pos.Line]
 
   let getText (lines: string[]) (r: LspRange) =
-    lines.[int r.Start.Line]
-      .Substring(int r.Start.Character, int (r.End.Character - r.Start.Character))
+    lines.[int r.Start.Line].Substring(int r.Start.Character, int (r.End.Character - r.Start.Character))
 
 [<AutoOpen>]
 module internal GlyphConversions =
@@ -325,7 +370,7 @@ module Workspace =
           match x.Kind with
           | Ionide.ProjInfo.InspectSln.SolutionItemKind.Unknown
           | Ionide.ProjInfo.InspectSln.SolutionItemKind.Unsupported -> None
-          | Ionide.ProjInfo.InspectSln.SolutionItemKind.MsbuildFormat _msbuildProj ->
+          | Ionide.ProjInfo.InspectSln.SolutionItemKind.MSBuildFormat _msbuildProj ->
             Some(
               WorkspacePeekFoundSolutionItemKind.MsbuildFormat
                 { WorkspacePeekFoundSolutionItemKindMsbuildFormat.Configurations = [] }

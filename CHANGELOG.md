@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.77.2] - 2025-02-17
+
+- [Update ProjInfo to 0.70.2](https://github.com/ionide/FsAutoComplete/pull/1358) (thanks @TheAngryByrd) - Fixes slow builds when using binlogs with Graph based builds
+
+## [0.77.1] - 2025-02-14
+
+### Fixed
+
+- [Update ProjInfo to 0.70.1](https://github.com/ionide/FsAutoComplete/pull/1357) (thanks @TheAngryByrd) - This fixes an issue with trying to design time build projects that can't be built
+
+## [0.77.0] - 2025-02-12
+
+### Changed
+
+- [Update to FSharp.Compiler.Service 43.9.201](https://github.com/ionide/FsAutoComplete/pull/1355) (thanks @TheAngryByrd) See [FCS Release Notes](https://github.com/dotnet/fsharp/blob/main/docs/release-notes/.FSharp.Compiler.Service/9.0.200.md)
+- [Transparent Compiler usage changes](https://github.com/ionide/FsAutoComplete/pull/1356) (thanks @TheAngryByrd)
+
+## [0.76.2] - 2025-02-09
+
+### Added 
+
+- [Added ability to search workspace by symbol name](https://github.com/ionide/FsAutoComplete/pull/1348) (thanks @1eyewonder!)
+
+### Fixed
+
+- [Preserve Whitespace in fsproj file.](https://github.com/ionide/FsAutoComplete/pull/1328) (thanks goswinr!)
+- [Tooltip: Add constraints to return types inner generics](https://github.com/ionide/FsAutoComplete/pull/1342) (thanks @TheAngryByrd!)
+- [CodeFix: AddPrivateAccessModifier code fix handle getter setter access separately](https://github.com/ionide/FsAutoComplete/pull/1346) (thanks @dawedawe!)
+- [Tooltip: add missing space in signature creation](https://github.com/ionide/FsAutoComplete/pull/1347) (thanks @dawedawe!)
+- [Tooltip: fix func signature for empty param names](https://github.com/ionide/FsAutoComplete/pull/1351) (thanks @dawedawe!)
+
+### Changed
+
+- [CodeFix: Wrap arg in parens when needed when adding new keyword](https://github.com/ionide/FsAutoComplete/pull/1335) (thanks @brianrourkeboll!)
+- [Analyzer: Enable unnecessary parentheses analyzer by default](https://github.com/ionide/FsAutoComplete/pull/1336) (thanks @brianrourkeboll!)
+- [Docs: Add link Zed extension in README](https://github.com/ionide/FsAutoComplete/pull/1345) (thanks @drhumlen!)
+- [Internal: Update to Fantomas 7.0.0](https://github.com/ionide/FsAutoComplete/pull/1344) (thanks @dawedawe!)
+- [Internal: Remove References to Net6 & Net7](https://github.com/ionide/FsAutoComplete/pull/1349) (thanks 1eyewonder!)
+
+### Fixed
+
+- [Docs: Update creating CodeFix documentation](https://github.com/ionide/FsAutoComplete/pull/1331) (thanks edgarfgp!)
+- [Internal: Added build debug to prelaunch task in tests](https://github.com/ionide/FsAutoComplete/pull/1332) (thanks 1eyewonder!)
+- [Internal: Bring back fantomas](https://github.com/ionide/FsAutoComplete/pull/1343) (thanks dawedawe!)
+
 ## [0.75.0] - 2024-11-24
 
 ### Added

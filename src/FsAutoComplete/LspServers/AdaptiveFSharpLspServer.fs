@@ -237,12 +237,7 @@ type AdaptiveFSharpLspServer
               )
               |> Option.defaultValue (async { return () })
           | (Some { Title = "Install globally" }) ->
-            let! result =
-              Cli
-                .Wrap("dotnet")
-                .WithArguments("tool install -g fantomas")
-                .ExecuteBufferedAsync()
-                .Task
+            let! result = Cli.Wrap("dotnet").WithArguments("tool install -g fantomas").ExecuteBufferedAsync().Task
 
             if result.ExitCode = 0 then
               fantomasLogger.info (Log.setMessage "fantomas was installed globally")
@@ -944,7 +939,7 @@ type AdaptiveFSharpLspServer
           let (filePath, pos) = getFilePathAndPosition p
           let! volatileFile = state.GetOpenFileOrRead filePath |> AsyncResult.ofStringErr
           let! lineStr = volatileFile.Source |> tryGetLineStr pos |> Result.lineLookupErr
-          and! tyRes = state.GetOpenFileTypeCheckResultsCached filePath |> AsyncResult.ofStringErr
+          and! tyRes = state.GetOpenFileTypeCheckResults filePath |> AsyncResult.ofStringErr
 
           match tyRes.TryGetToolTipEnhanced pos lineStr with
           | Some tooltipResult ->
@@ -1309,9 +1304,8 @@ type AdaptiveFSharpLspServer
 
           return
             decls
-            |> Array.collect (fun top ->
-              getSymbolInformations p.TextDocument.Uri state.GlyphToSymbolKind top (fun _s -> true))
-            |> U2.C1
+            |> Array.collect (getDocumentSymbols state.GlyphToSymbolKind)
+            |> U2.C2
             |> Some
         with e ->
           trace |> Tracing.recordException e
@@ -1346,9 +1340,8 @@ type AdaptiveFSharpLspServer
               let uri = Path.LocalPathToUri p
 
               ns
-              |> Array.collect (fun n ->
-                getSymbolInformations uri glyphToSymbolKind n (applyQuery symbolRequest.Query)))
-            |> U2.C1
+              |> Array.collect (fun n -> getWorkspaceSymbols uri glyphToSymbolKind n (applyQuery symbolRequest.Query)))
+            |> U2.C2
             |> Some
 
           return res
@@ -1587,7 +1580,7 @@ type AdaptiveFSharpLspServer
           let filePath = Path.FileUriToLocalPath data.[0] |> Utils.normalizePath
 
           try
-            let! tyRes = state.GetOpenFileTypeCheckResultsCached filePath |> AsyncResult.ofStringErr
+            let! tyRes = state.GetOpenFileTypeCheckResults filePath |> AsyncResult.ofStringErr
 
 
             logger.info (
@@ -2256,7 +2249,7 @@ type AdaptiveFSharpLspServer
 
     override x.WorkspaceDiagnostic p = x.logUnimplementedRequest p
 
-    override x.WorkspaceSymbolResolve p = x.logUnimplementedRequest p
+    override x.WorkspaceSymbolResolve p = AsyncLspResult.success p
 
     //unsupported -- end
 
