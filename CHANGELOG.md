@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.77.4] - 2025-03-06
+
+### Changed
+
+- [Update FSharp.Analyzers.SDK to 0.29.1](https://github.com/ionide/FsAutoComplete/pull/1367) - Fixes issue where FSAC would lock analyzer dlls on Windows OSes
+
+### Fixed
+
+- [Fix textDocument/hover for function, generic and tuple alias types](https://github.com/ionide/FsAutoComplete/pull/1365) and [#1366](https://github.com/ionide/FsAutoComplete/pull/1366) (Thanks @SoxPopuli!)
+
+
+## [0.77.3] - 2025-03-02
+
+- [Add exclusion config for parens analyzer](https://github.com/ionide/FsAutoComplete/pull/1363) (thanks @brianrourkeboll)
+
 ## [0.77.2] - 2025-02-17
 
 - [Update ProjInfo to 0.70.2](https://github.com/ionide/FsAutoComplete/pull/1358) (thanks @TheAngryByrd) - Fixes slow builds when using binlogs with Graph based builds

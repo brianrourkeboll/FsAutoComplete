@@ -40,6 +40,73 @@ module SignatureFormatter =
 
   let private isMeasureType (t: FSharpEntity) = Set.contains t.FullName measureTypeNames
 
+  type ParameterType =
+    | Generic of FSharpGenericParameter
+    | WithGenericArguments of FSharpType
+    | Concrete of FSharpEntity
+    | Function of ParameterType list
+    | Tuple of ParameterType list
+    | StructTuple of ParameterType list
+
+    static member displayName =
+      function
+      | Generic x -> "'" + x.DisplayName
+      | WithGenericArguments x ->
+        let parameters =
+          x.GenericArguments
+          |> Seq.map (ParameterType.getParameterType >> ParameterType.displayName)
+          |> String.join ", "
+
+        let displayName = x.TypeDefinition.DisplayName
+
+        displayName + "<" + parameters + ">"
+      | Concrete x -> x.DisplayName
+      | Function x -> x |> List.map ParameterType.displayName |> String.join " -> "
+      | Tuple x ->
+        let args = x |> List.map ParameterType.displayName |> String.join " * "
+        $"({args})"
+      | StructTuple x ->
+        let args = x |> List.map ParameterType.displayName |> String.join " * "
+        $"struct ({args})"
+
+    static member displayNameUnAnnotated =
+      function
+      | Generic x -> "'" + x.DisplayName
+      | WithGenericArguments x ->
+        let parameters =
+          x.GenericArguments
+          |> Seq.map (ParameterType.getParameterType >> ParameterType.displayNameUnAnnotated)
+          |> String.join ", "
+
+        let displayName = x.TypeDefinition.UnAnnotate().DisplayName
+
+        displayName + "<" + parameters + ">"
+      | Concrete x -> x.UnAnnotate().DisplayName
+      | Function x -> x |> List.map ParameterType.displayNameUnAnnotated |> String.join " -> "
+      | Tuple x ->
+        let args = x |> List.map ParameterType.displayNameUnAnnotated |> String.join " * "
+        $"({args})"
+      | StructTuple x ->
+        let args = x |> List.map ParameterType.displayNameUnAnnotated |> String.join " * "
+        $"struct ({args})"
+
+    static member getParameterType(x: FSharpType) : ParameterType =
+      if x.IsFunctionType then
+        Function(ParameterType.getGenericArgumentTypes x)
+      else if x.IsGenericParameter then
+        Generic x.GenericParameter
+      else if x.IsStructTupleType then
+        StructTuple(ParameterType.getGenericArgumentTypes x)
+      else if x.IsTupleType then
+        Tuple(ParameterType.getGenericArgumentTypes x)
+      else if x.GenericArguments.Count > 0 then
+        WithGenericArguments x
+      else
+        x.TypeDefinition |> Concrete
+
+    static member getGenericArgumentTypes(e: FSharpType) : ParameterType list =
+      e.GenericArguments |> Seq.map ParameterType.getParameterType |> Seq.toList
+
   let rec formatFSharpType (context: FSharpDisplayContext) (typ: FSharpType) : string =
     let context = context.WithPrefixGenericParameters()
 
@@ -58,6 +125,11 @@ module SignatureFormatter =
           sprintf "struct (%s)" refTupleStr
         else
           refTupleStr
+      elif typ.IsAbbreviation && typ.AbbreviatedType.IsFunctionType then
+        typ.AbbreviatedType
+        |> ParameterType.getGenericArgumentTypes
+        |> List.map ParameterType.displayName
+        |> String.join " -> "
       elif typ.IsGenericParameter then // no longer need to differentiate between SRTP and normal generic parameter types
         "'" + typ.GenericParameter.Name
       elif typ.HasTypeDefinition && typ.GenericArguments.Count > 0 then
@@ -728,15 +800,48 @@ module SignatureFormatter =
       let basicName = modifier + typeName ++ name
 
       if fse.IsFSharpAbbreviation then
-        let unannotatedType = fse.UnAnnotate()
-        basicName ++ "=" ++ (unannotatedType.DisplayName)
+        if fse.AbbreviatedType.IsFunctionType then
+          let typeNames =
+            ParameterType.getGenericArgumentTypes fse.AbbreviatedType
+            |> List.map ParameterType.displayNameUnAnnotated
+            |> String.join " -> "
+
+          basicName ++ "=" ++ typeNames
+        else if fse.AbbreviatedType.IsGenericParameter then
+          basicName ++ "=" ++ $"'{fse.AbbreviatedType.GenericParameter.DisplayName}"
+        else if fse.AbbreviatedType.IsStructTupleType then
+          let typeNames =
+            ParameterType.getGenericArgumentTypes fse.AbbreviatedType
+            |> List.map ParameterType.displayNameUnAnnotated
+            |> String.join " * "
+
+          basicName ++ "=" ++ $"struct ({typeNames})"
+        else if fse.AbbreviatedType.IsTupleType then
+          let typeNames =
+            ParameterType.getGenericArgumentTypes fse.AbbreviatedType
+            |> List.map ParameterType.displayNameUnAnnotated
+            |> String.join " * "
+
+          basicName ++ "=" ++ $"({typeNames})"
+        else
+          let unannotatedType = fse.UnAnnotate()
+          basicName ++ "=" ++ (unannotatedType.DisplayName)
       else
         basicName
 
-    if fse.IsFSharpUnion then typeDisplay + unionTip ()
-    elif fse.IsEnum then typeDisplay + enumTip ()
-    elif fse.IsDelegate then typeDisplay + delegateTip ()
-    else typeDisplay + typeTip ()
+    if fse.IsFSharpUnion then
+      typeDisplay + unionTip ()
+    elif fse.IsEnum then
+      typeDisplay + enumTip ()
+    elif fse.IsDelegate then
+      typeDisplay + delegateTip ()
+    elif
+      fse.IsFSharpAbbreviation
+      && (fse.AbbreviatedType.IsTupleType || fse.AbbreviatedType.IsStructTupleType)
+    then
+      typeDisplay
+    else
+      typeDisplay + typeTip ()
 
   let footerForType (entity: FSharpSymbolUse) =
     let formatFooter (fullName, asmName) = $"Full name: %s{fullName}{nl}Assembly: %s{asmName}"
